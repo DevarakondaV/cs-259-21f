@@ -16,6 +16,15 @@ void dot_prod_kernel(const float *a, const float *b, float *c, const int num_ele
   /***************************
    * your code goes here ... *
    ***************************/
+  #pragma HLS array_partition variable=a factor=num_elems dim=0
+  #pragma HLS array_partition variable=b factor=num_elems dim=0
+
+  for(int i=0; i < num_elems; i++){
+    #pragma HLS dataflow
+    #pragma HLS stable variable=c
+    #pragma HLS unroll
+    *c = *c + (a[i]*b[i])
+  }
 }
 
 }  // extern "C"
