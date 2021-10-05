@@ -16,13 +16,49 @@ void dot_prod_kernel(const float *a, const float *b, float *c, const int num_ele
   /***************************
    * your code goes here ... *
    ***************************/
-  #pragma HLS array_partition variable=a factor=num_elems dim=0
-  #pragma HLS array_partition variable=b factor=num_elems dim=0
-
+  //#pragma HLS array_partition variable=a type=block factor=2 dim=0
+  //#pragma HLS array_partition variable=b type=block factor=2 dim=0
+  float C[4097];
+  //#pragma HLS array_partition variable=C type=block factor=2 dim=0
   for(int i=0; i < num_elems; i++){
-    #pragma HLS unroll
-    *c = *c + (a[i]*b[i])
+    #pragma HLS pipeline II=1 style=stp
+    #pragma HLS unroll factor=2
+    //#pragma HLS dependence variable=c pointer type=intra dependent=true
+    C[i] = a[i] * b[i];
+      //*c = *c + (a[i]*b[i]);
+  }
+
+  // sum
+  for(int i=0; i < num_elems; i++){
+    *c = *c +  C[i];
   }
 }
 
 }  // extern "C"
+
+/*
+Read a,
+Read b
+ops * a b
+write c
+ */
+
+/*
+Load, compute, store pattern
+ */
+
+/*
+current: 
+
+float: 2^5
+a = 2^12
+b = 2^12
+
+c = 2^5
+
+totMem = 2^5 * 2^12 * 2 = 2^18 + 2^5 = 262176 
+
+latency -> [1, 344207]
+
+without unroll -> 24k
+*/
