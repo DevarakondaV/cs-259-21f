@@ -1,7 +1,28 @@
 #include <assert.h>
 
 extern "C" {
+  /*
+  void fillCab(float * C, const float * a, const float * b, const int num_elems){
+    #pragma HLS dataflow
+    for(int i=0; i< num_elems; i++){
+      #pragma HLS pipeline II=1
+      C[i][0] = a[i];
+      C[i][1] = b[i];
+      C[i][2] = 0;
+    }
+  }
 
+void fillEmpty(float * C, const int num_elems){
+  #pragma HLS dataflow
+  for(int j=num_elems; j < 4098; j++){
+    #pragma HLS pipeline II=1
+    C[j][0] = 0;
+    C[j][1] = 0;
+    C[j][1] = 0;
+    }
+  */
+ 
+ 
 void dot_prod_kernel(const float *a, const float *b, float *c, const int num_elems) {
   /********  you can change AXI bus width  **********/
 #pragma HLS interface m_axi port = a offset = slave bundle = gmem
@@ -18,50 +39,38 @@ void dot_prod_kernel(const float *a, const float *b, float *c, const int num_ele
    ***************************/
   //#pragma HLS array_partition variable=a type=block factor=2 dim=0
   //#pragma HLS array_partition variable=b type=block factor=2 dim=0
-  for(int i=0; i < num_elems; i++){
-    #pragma HLS pipeline II=1 style=stp
-    #pragma HLS unroll factor=2
-    a[i] = a[i] * b[i];
-  }
-
-  // sum
-  for(int i=0; i < num_elems; i++){
-    *c = *c +  a[i];
-  }
-
-
-
+ 
   /* Approach 2. Place values inside C. Partition C completely. Compute*/
-  float C[4098][2];
-
+  float C[4098][3];
+  //#pragma HLS dataflow
   for(int i=0;i<num_elems;i++){
-  #pragma HLS pipeline II=1 rewind 
+    #pragma HLS pipeline II=1 rewind 
     C[i][0] = a[i];
     C[i][1] = b[i];
-  }
+    C[i][2] = 0;
+   }
 
-  for(int j = num_elems; i < 4098; i++){
-  #pragma HLS pipeline II=1 rewind 
-    C[i][0] = 0;
-    C[i][1] = 0;
-  }
+ for(int j = num_elems; j < 4098; j++){
+    #pragma HLS pipeline II=1 rewind 
+    C[j][0] = 0;
+    C[j][1] = 0;
+    C[j][2] = 0;
+    }
 
-  #pragma HLS array_partition variable=C dim=0
+  //  fillCab(C, a, b, num_elems);
+  //fillEmpty(C, num_elems);
+
+  // 282 optimal block size but doesn't compile
+  #pragma HLS array_partition variable=C dim=0 block=2
   for(int i=0; i <= 4096; i++){
-    #pragma HLS unroll
-    C[4097][0] = C[4097][0] + C[i][0] * C[i][1];
-    // C[i][0] = C[i][0] * C[i][1];
+    #pragma HLS pipeline II=1 rewind
+    #pragma HLS unroll factor=2
+    C[i+1][2] = C[i][2] + C[i][0] * C[i][1];
   }
 
-  /*
-  for(int i = 0; i <= 4096; i++){
-    #pragma HLS dataflow
-    #pragma HLS dependence variable=C[4097] class=pointer type=inter direction=RAW dependent=true 
-    C[4097][0] = C[4097][0] + C[i][0] * C[i][1]
-  }*/
-
-  *c = C[4097][0];
+  *c = C[4097][2];
 }
+
 
 }  // extern "C"
 
@@ -74,6 +83,11 @@ write c
 
 /*
 Load, compute, store pattern
+ */
+
+/*
+18k
+18000 / 2^5*2
  */
 
 /*
