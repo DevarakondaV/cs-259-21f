@@ -18,20 +18,49 @@ void dot_prod_kernel(const float *a, const float *b, float *c, const int num_ele
    ***************************/
   //#pragma HLS array_partition variable=a type=block factor=2 dim=0
   //#pragma HLS array_partition variable=b type=block factor=2 dim=0
-  float C[4097];
-  //#pragma HLS array_partition variable=C type=block factor=2 dim=0
   for(int i=0; i < num_elems; i++){
     #pragma HLS pipeline II=1 style=stp
     #pragma HLS unroll factor=2
-    //#pragma HLS dependence variable=c pointer type=intra dependent=true
-    C[i] = a[i] * b[i];
-      //*c = *c + (a[i]*b[i]);
+    a[i] = a[i] * b[i];
   }
 
   // sum
   for(int i=0; i < num_elems; i++){
-    *c = *c +  C[i];
+    *c = *c +  a[i];
   }
+
+
+
+  /* Approach 2. Place values inside C. Partition C completely. Compute*/
+  float C[4098][2];
+
+  for(int i=0;i<num_elems;i++){
+  #pragma HLS pipeline II=1 rewind 
+    C[i][0] = a[i];
+    C[i][1] = b[i];
+  }
+
+  for(int j = num_elems; i < 4098; i++){
+  #pragma HLS pipeline II=1 rewind 
+    C[i][0] = 0;
+    C[i][1] = 0;
+  }
+
+  #pragma HLS array_partition variable=C dim=0
+  for(int i=0; i <= 4096; i++){
+    #pragma HLS unroll
+    C[4097][0] = C[4097][0] + C[i][0] * C[i][1];
+    // C[i][0] = C[i][0] * C[i][1];
+  }
+
+  /*
+  for(int i = 0; i <= 4096; i++){
+    #pragma HLS dataflow
+    #pragma HLS dependence variable=C[4097] class=pointer type=inter direction=RAW dependent=true 
+    C[4097][0] = C[4097][0] + C[i][0] * C[i][1]
+  }*/
+
+  *c = C[4097][0];
 }
 
 }  // extern "C"
